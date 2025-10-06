@@ -2,7 +2,7 @@ name: 'Database Infrastructure - Terraform Plan'
 
 on:
   pull_request:
-    branches: [main]
+    branches: [modulo_3]
     paths:
       - 'terraform/**'
       - '.github/workflows/terraform-plan.yml'
