@@ -1,0 +1,72 @@
+name: 'Database Infrastructure - Terraform Apply'
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'terraform/**'
+      - '.github/workflows/terraform-apply.yml'
+
+env:
+  TF_VERSION: '1.5.0'
+
+jobs:
+  terraform-apply:
+    name: 'Terraform Apply'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v2
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+        aws-region: us-east-1
+
+    - name: Terraform Init
+      run: terraform init
+
+    - name: Terraform Plan
+      run: terraform plan -input=false
+
+    - name: Terraform Apply
+      run: terraform apply -auto-approve -input=false
+
+    - name: Get RDS Endpoint
+      id: rds_endpoint
+      run: |
+        echo "rds_endpoint=$(terraform output -raw rds_endpoint)" >> $GITHUB_OUTPUT
+
+    - name: Notify Success
+      if: success()
+      run: |
+        echo "✅ Database infrastructure deployed successfully!"
+        echo "RDS Endpoint: ${{ steps.rds_endpoint.outputs.rds_endpoint }}"
+
+    - name: Trigger K8s Infrastructure Deploy
+      if: success()
+      uses: actions/github-script@v6
+      with:
+        github-token: ${{ secrets.REPO_ACCESS_TOKEN }}
+        script: |
+          github.rest.repos.createDispatchEvent({
+            owner: 'laahundskarl',
+            repo: 'fast-food-k8s-infra',
+            event_type: 'database-ready',
+            client_payload: {
+              rds_endpoint: '${{ steps.rds_endpoint.outputs.rds_endpoint }}',
+              trigger_source: 'database-infrastructure'
+            }
+          })
