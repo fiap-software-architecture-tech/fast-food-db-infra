@@ -1,7 +1,16 @@
 name: 'Infrastructure - Deploy Database'
 
 on:
-  push:
+       - name: Terraform Apply
+        run: terraform apply -auto-approve -input=false
+
+      - name: Debug Terraform Outputs
+        run: |
+          echo "=== Available Terraform Outputs ==="
+          terraform output
+          echo "====================================="
+
+      - name: Get RDS Endpointh:
     branches: [modulo_3]
     paths:
       - 'terraform/**'
@@ -51,12 +60,12 @@ jobs:
     - name: Terraform Apply
       run: terraform apply -auto-approve -input=false
 
-    - name: Get RDS Endpoint
-      id: rds_endpoint
-      run: |
-        echo "rds_endpoint=$(terraform output -raw rds_endpoint)" >> $GITHUB_OUTPUT
-
-    - name: Notify Success
+      - name: Get RDS Endpoint
+        id: rds_endpoint
+        run: |
+          RDS_ADDRESS=$(terraform output -raw rds_address)
+          echo "rds_endpoint=$RDS_ADDRESS" >> $GITHUB_OUTPUT
+          echo "RDS Address captured: $RDS_ADDRESS"    - name: Notify Success
       if: success()
       run: |
         echo "✅ Database infrastructure deployed successfully!"
