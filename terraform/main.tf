@@ -16,6 +16,18 @@ data "aws_subnet" "fastfood_subnet_1b" {
   id = "subnet-07fe020cefc4bd241"  # us-east-1b
 }
 
+# Data source para o security group do EKS (criado pelo repo K8s)
+data "aws_security_groups" "eks_node_sg" {
+  filter {
+    name   = "tag:kubernetes.io/cluster/fast-food-cluster-prd"
+    values = ["owned"]
+  }
+  filter {
+    name   = "group-name"
+    values = ["*node*"]
+  }
+}
+
 # Lista das subnets para o RDS
 locals {
   rds_subnet_ids = [
@@ -56,6 +68,17 @@ resource "aws_security_group" "rds_mysql" {
   lifecycle {
     create_before_destroy = true
   }
+}
+
+# Security group rule para permitir acesso do EKS ao RDS
+resource "aws_security_group_rule" "rds_mysql_access_from_eks" {
+  type                     = "ingress"
+  from_port                = 3306
+  to_port                  = 3306
+  protocol                 = "tcp"
+  source_security_group_id = data.aws_security_groups.eks_node_sg.ids[0]
+  security_group_id        = aws_security_group.rds_mysql.id
+  description              = "MySQL access from EKS cluster"
 }
 
 # Subnet group para o RDS
