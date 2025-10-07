@@ -63,9 +63,9 @@ jobs:
     - name: Get RDS Endpoint
       id: rds_endpoint
       run: |
-        RDS_ADDRESS=$(terraform output -raw rds_address)
-        echo "rds_endpoint=$RDS_ADDRESS" >> $GITHUB_OUTPUT
-        echo "RDS Address captured: $RDS_ADDRESS"
+        RDS_ADDRESS=$(terraform output -raw rds_address | tr -d '\n' | tr -d '\r')
+        echo "rds_endpoint=${RDS_ADDRESS}" >> $GITHUB_OUTPUT
+        echo "RDS Address captured: ${RDS_ADDRESS}"
 
     - name: Notify Success
       if: success()
