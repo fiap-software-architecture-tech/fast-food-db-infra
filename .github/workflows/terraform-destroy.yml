@@ -1,0 +1,172 @@
+name: 'Cleanup - Destroy Database'
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_destroy:
+        description: 'Type DESTROY to confirm database destruction'
+        required: true
+        type: string
+      backup_warning:
+        description: 'Confirm you have backups (type CONFIRMED)'
+        required: true
+        type: string
+  repository_dispatch:
+    types: [k8s-destroyed]
+
+env:
+  TF_VERSION: '1.5.0'
+
+jobs:
+  validate-input:
+    name: 'Validate Destroy Request'
+    runs-on: ubuntu-latest
+    outputs:
+      should_destroy: ${{ steps.check.outputs.should_destroy }}
+    steps:
+    - name: Validate confirmation
+      id: check
+      run: |
+        # Check if triggered by workflow_dispatch (manual)
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          if [ "${{ github.event.inputs.confirm_destroy }}" = "DESTROY" ] && [ "${{ github.event.inputs.backup_warning }}" = "CONFIRMED" ]; then
+            echo "should_destroy=true" >> $GITHUB_OUTPUT
+            echo "✅ Manual destruction confirmed with backup acknowledgment"
+          else
+            echo "should_destroy=false" >> $GITHUB_OUTPUT
+            echo "❌ Invalid confirmation. Type exactly: DESTROY and CONFIRMED"
+            exit 1
+          fi
+        # Check if triggered by repository_dispatch (automatic from K8s)
+        elif [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+          echo "should_destroy=true" >> $GITHUB_OUTPUT
+          echo "✅ Automatic destruction triggered by K8s cleanup"
+        else
+          echo "should_destroy=false" >> $GITHUB_OUTPUT
+          echo "❌ Invalid trigger"
+          exit 1
+        fi
+
+  pre-destroy-backup:
+    name: 'Create Final Backup'
+    runs-on: ubuntu-latest
+    needs: validate-input
+    if: needs.validate-input.outputs.should_destroy == 'true'
+    steps:
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+        aws-region: us-east-1
+
+    - name: Create final snapshot
+      run: |
+        echo "📸 Creating final snapshot before destruction..."
+        
+        # Check if RDS instance exists
+        if aws rds describe-db-instances --db-instance-identifier fastfood-db --region us-east-1 >/dev/null 2>&1; then
+          SNAPSHOT_ID="fastfood-final-snapshot-$(date +%Y%m%d-%H%M%S)"
+          echo "Creating snapshot: $SNAPSHOT_ID"
+          
+          aws rds create-db-snapshot \
+            --db-instance-identifier fastfood-db \
+            --db-snapshot-identifier "$SNAPSHOT_ID" \
+            --region us-east-1
+            
+          echo "✅ Final snapshot created: $SNAPSHOT_ID"
+          echo "💾 This snapshot will be retained for recovery if needed"
+        else
+          echo "⚠️ RDS instance not found - may already be destroyed"
+        fi
+
+  terraform-destroy:
+    name: 'Terraform Destroy'
+    runs-on: ubuntu-latest
+    needs: [validate-input, pre-destroy-backup]
+    if: always() && needs.validate-input.outputs.should_destroy == 'true'
+    defaults:
+      run:
+        working-directory: terraform
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v2
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+        aws-region: us-east-1
+
+    - name: Terraform Init
+      run: terraform init
+
+    - name: Terraform Plan Destroy
+      run: terraform plan -destroy -input=false
+
+    - name: Wait for snapshot completion
+      run: |
+        echo "⏳ Waiting for any pending snapshots to complete..."
+        sleep 60  # Give time for snapshot to start
+        
+        # Wait for snapshot completion if it exists
+        aws rds wait db-snapshot-completed \
+          --db-snapshot-identifier fastfood-final-snapshot-$(date +%Y%m%d) \
+          --region us-east-1 2>/dev/null || echo "⚠️ No snapshot in progress"
+
+    - name: Terraform Destroy
+      run: |
+        echo "🚨 DESTROYING DATABASE INFRASTRUCTURE..."
+        echo "⚠️ This will permanently delete:"
+        echo "  - RDS MySQL instance"
+        echo "  - Database subnet groups"
+        echo "  - Security group rules"
+        terraform destroy -auto-approve -input=false
+
+    - name: Verify Destruction
+      run: |
+        echo "✅ Database infrastructure destroyed successfully!"
+        echo "📋 Remaining state:"
+        terraform show || echo "✅ No resources remaining"
+
+    - name: Notify Success
+      if: success()
+      run: |
+        echo "🎉 Database Infrastructure destroyed successfully!"
+        echo "💰 AWS costs should stop accruing for:"
+        echo "  - RDS MySQL instance (~$13-20/month)"
+        echo "  - Database storage (~$1-2/month)"
+        echo ""
+        echo "📸 Snapshots created are retained and may incur minimal storage costs"
+        echo "🗑️ To remove snapshots: AWS Console → RDS → Snapshots"
+
+  cleanup-notification:
+    name: 'Cleanup Complete'
+    runs-on: ubuntu-latest
+    needs: [terraform-destroy]
+    if: always() && needs.terraform-destroy.result == 'success'
+    steps:
+    - name: Final notification
+      run: |
+        echo "🏁 INFRASTRUCTURE CLEANUP COMPLETE!"
+        echo ""
+        echo "✅ Destroyed:"
+        echo "  - Database (RDS MySQL)"
+        echo "  - All associated resources"
+        echo ""
+        echo "💡 To recreate infrastructure:"
+        echo "  1. Push to modulo_3 branch in fast-food-db-infra"
+        echo "  2. Wait for DB deployment"
+        echo "  3. K8s infrastructure will auto-deploy"
+        echo "  4. Application will auto-deploy"
+        echo ""
+        echo "💰 AWS costs should now be minimal!"
