@@ -1,4 +1,4 @@
-name: 'Database Infrastructure - Terraform Destroy'
+name: 'Cleanup - Destroy Database'
 
 on:
   workflow_dispatch:
