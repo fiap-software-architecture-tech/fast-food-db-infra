@@ -1,4 +1,4 @@
-﻿# ===========================
+# ===========================
 # DATABASE OUTPUTS
 # ===========================
 
@@ -30,7 +30,7 @@ output "rds_port" {
 
 output "database_url" {
   description = "URL completa de conexão do banco"
-  value       = "mysql://:@/?allowPublicKeyRetrieval=true"
+  value       = "mysql://${aws_db_instance.fastfood_mysql.username}:${var.db_password}@${aws_db_instance.fastfood_mysql.endpoint}/${aws_db_instance.fastfood_mysql.db_name}?allowPublicKeyRetrieval=true"
   sensitive   = true
 }
 
