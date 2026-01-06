@@ -130,35 +130,3 @@ resource "aws_db_instance" "fastfood_mysql" {
     Environment = var.environment
   }
 }
-
-# RDS MySQL Instance para Pagamentos
-resource "aws_db_instance" "fastfood_payments_mysql" {
-  identifier = "fastfood-payments-db"
-
-  engine         = "mysql"
-  engine_version = "8.0"
-  instance_class = var.payments_db_instance_class
-
-  allocated_storage = var.payments_db_allocated_storage
-  storage_type     = "gp2"
-  storage_encrypted = var.payments_db_storage_encrypted
-
-  db_name  = var.payments_db_name
-  username = var.payments_db_username
-  password = var.payments_db_password
-  port     = 3306
-
-  vpc_security_group_ids = [aws_security_group.rds_mysql.id]
-  db_subnet_group_name   = aws_db_subnet_group.fastfood_mysql.name
-
-  publicly_accessible    = false
-  multi_az                = var.payments_db_multi_az
-  backup_retention_period = var.payments_db_backup_retention_period
-  
-  tags = {
-    Name = "fastfood-payments-rds"
-    ManagedBy = "terraform"
-    Component = "payments-database"
-    Environment = var.environment
-  }
-}
