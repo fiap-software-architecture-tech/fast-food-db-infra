@@ -67,3 +67,27 @@ output "eks_nodes_security_group_arn" {
   description = "ARN do security group dos nodes EKS"
   value       = aws_security_group.eks_nodes.arn
 }
+
+# ===========================
+# DYNAMODB OUTPUTS
+# ===========================
+
+output "dynamodb_cook_to_order_table_name" {
+  description = "Nome da tabela DynamoDB para cook-to-order"
+  value       = aws_dynamodb_table.orders_cook_to_order.name
+}
+
+output "dynamodb_cook_to_order_table_arn" {
+  description = "ARN da tabela DynamoDB para cook-to-order"
+  value       = aws_dynamodb_table.orders_cook_to_order.arn
+}
+
+output "dynamodb_cook_to_order_table_id" {
+  description = "ID da tabela DynamoDB para cook-to-order"
+  value       = aws_dynamodb_table.orders_cook_to_order.id
+}
+
+output "dynamodb_cook_to_order_hash_key" {
+  description = "Hash key da tabela DynamoDB cook-to-order"
+  value       = aws_dynamodb_table.orders_cook_to_order.hash_key
+}
