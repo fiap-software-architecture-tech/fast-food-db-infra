@@ -44,7 +44,26 @@ output "rds_subnet_group_name" {
   value       = aws_db_subnet_group.fastfood_mysql.name
 }
 
+# ===========================
+# SECURITY GROUPS OUTPUTS
+# ===========================
+
 output "rds_security_group_id" {
   description = "Security Group ID usado pelo RDS"
   value       = aws_security_group.rds_mysql.id
+}
+
+output "eks_nodes_security_group_id" {
+  description = "Security Group ID para os nodes do EKS"
+  value       = aws_security_group.eks_nodes.id
+}
+
+output "rds_security_group_arn" {
+  description = "ARN do security group do RDS"
+  value       = aws_security_group.rds_mysql.arn
+}
+
+output "eks_nodes_security_group_arn" {
+  description = "ARN do security group dos nodes EKS"
+  value       = aws_security_group.eks_nodes.arn
 }
