@@ -163,3 +163,52 @@ output "dynamodb_cook_to_order_hash_key" {
   description = "Hash key da tabela DynamoDB cook-to-order"
   value       = aws_dynamodb_table.orders_cook_to_order.hash_key
 }
+
+# ===========================
+# OUTPUTS PARA LAMBDAS
+# ===========================
+
+output "rds_credentials" {
+  description = "RDS credentials for Lambda functions"
+  value = {
+    username = var.db_username
+    password = var.db_password
+  }
+  sensitive = true
+}
+
+output "vpc_config" {
+  description = "VPC configuration for Lambda functions"
+  value = {
+    vpc_id             = data.aws_vpc.existing.id
+    subnet_ids         = local.rds_subnet_ids
+    security_group_id  = aws_security_group.rds_mysql.id
+  }
+}
+
+output "order_database_config" {
+  description = "Order database configuration"
+  value = {
+    host     = aws_db_instance.fastfood_order.endpoint
+    database = aws_db_instance.fastfood_order.db_name
+    port     = aws_db_instance.fastfood_order.port
+  }
+}
+
+output "payment_database_config" {
+  description = "Payment database configuration"
+  value = {
+    host     = aws_db_instance.fastfood_payment.endpoint
+    database = aws_db_instance.fastfood_payment.db_name
+    port     = aws_db_instance.fastfood_payment.port
+  }
+}
+
+output "dynamodb_config" {
+  description = "DynamoDB configuration"
+  value = {
+    table_name = aws_dynamodb_table.orders_cook_to_order.name
+    table_arn  = aws_dynamodb_table.orders_cook_to_order.arn
+    region     = var.aws_region
+  }
+}
