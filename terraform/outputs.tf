@@ -45,6 +45,78 @@ output "rds_subnet_group_name" {
 }
 
 # ===========================
+# ORDER DATABASE OUTPUTS
+# ===========================
+
+output "rds_order_endpoint" {
+  description = "Endpoint do RDS MySQL - Order Service"
+  value       = aws_db_instance.fastfood_order.endpoint
+}
+
+output "rds_order_address" {
+  description = "Address do RDS MySQL Order (sem porta)"
+  value       = aws_db_instance.fastfood_order.address
+}
+
+output "rds_order_database_name" {
+  description = "Nome do banco de dados Order"
+  value       = aws_db_instance.fastfood_order.db_name
+}
+
+output "rds_order_username" {
+  description = "Username do banco Order"
+  value       = aws_db_instance.fastfood_order.username
+  sensitive   = true
+}
+
+output "rds_order_port" {
+  description = "Porta do banco Order"
+  value       = aws_db_instance.fastfood_order.port
+}
+
+output "order_database_url" {
+  description = "URL completa de conexão do banco Order"
+  value       = "mysql://:@${aws_db_instance.fastfood_order.endpoint}/fastfood_order?allowPublicKeyRetrieval=true"
+  sensitive   = true
+}
+
+# ===========================
+# PAYMENT DATABASE OUTPUTS
+# ===========================
+
+output "rds_payment_endpoint" {
+  description = "Endpoint do RDS MySQL - Payment Service"
+  value       = aws_db_instance.fastfood_payment.endpoint
+}
+
+output "rds_payment_address" {
+  description = "Address do RDS MySQL Payment (sem porta)"
+  value       = aws_db_instance.fastfood_payment.address
+}
+
+output "rds_payment_database_name" {
+  description = "Nome do banco de dados Payment"
+  value       = aws_db_instance.fastfood_payment.db_name
+}
+
+output "rds_payment_username" {
+  description = "Username do banco Payment"
+  value       = aws_db_instance.fastfood_payment.username
+  sensitive   = true
+}
+
+output "rds_payment_port" {
+  description = "Porta do banco Payment"
+  value       = aws_db_instance.fastfood_payment.port
+}
+
+output "payment_database_url" {
+  description = "URL completa de conexão do banco Payment"
+  value       = "mysql://:@${aws_db_instance.fastfood_payment.endpoint}/fastfood_payment?allowPublicKeyRetrieval=true"
+  sensitive   = true
+}
+
+# ===========================
 # SECURITY GROUPS OUTPUTS
 # ===========================
 
