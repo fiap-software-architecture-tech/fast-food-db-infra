@@ -45,6 +45,78 @@ output "rds_subnet_group_name" {
 }
 
 # ===========================
+# ORDER DATABASE OUTPUTS
+# ===========================
+
+output "rds_order_endpoint" {
+  description = "Endpoint do RDS MySQL - Order Service"
+  value       = aws_db_instance.fastfood_order.endpoint
+}
+
+output "rds_order_address" {
+  description = "Address do RDS MySQL Order (sem porta)"
+  value       = aws_db_instance.fastfood_order.address
+}
+
+output "rds_order_database_name" {
+  description = "Nome do banco de dados Order"
+  value       = aws_db_instance.fastfood_order.db_name
+}
+
+output "rds_order_username" {
+  description = "Username do banco Order"
+  value       = aws_db_instance.fastfood_order.username
+  sensitive   = true
+}
+
+output "rds_order_port" {
+  description = "Porta do banco Order"
+  value       = aws_db_instance.fastfood_order.port
+}
+
+output "order_database_url" {
+  description = "URL completa de conexão do banco Order"
+  value       = "mysql://:@${aws_db_instance.fastfood_order.endpoint}/fastfood_order?allowPublicKeyRetrieval=true"
+  sensitive   = true
+}
+
+# ===========================
+# PAYMENT DATABASE OUTPUTS
+# ===========================
+
+output "rds_payment_endpoint" {
+  description = "Endpoint do RDS MySQL - Payment Service"
+  value       = aws_db_instance.fastfood_payment.endpoint
+}
+
+output "rds_payment_address" {
+  description = "Address do RDS MySQL Payment (sem porta)"
+  value       = aws_db_instance.fastfood_payment.address
+}
+
+output "rds_payment_database_name" {
+  description = "Nome do banco de dados Payment"
+  value       = aws_db_instance.fastfood_payment.db_name
+}
+
+output "rds_payment_username" {
+  description = "Username do banco Payment"
+  value       = aws_db_instance.fastfood_payment.username
+  sensitive   = true
+}
+
+output "rds_payment_port" {
+  description = "Porta do banco Payment"
+  value       = aws_db_instance.fastfood_payment.port
+}
+
+output "payment_database_url" {
+  description = "URL completa de conexão do banco Payment"
+  value       = "mysql://:@${aws_db_instance.fastfood_payment.endpoint}/fastfood_payment?allowPublicKeyRetrieval=true"
+  sensitive   = true
+}
+
+# ===========================
 # SECURITY GROUPS OUTPUTS
 # ===========================
 
@@ -66,4 +138,77 @@ output "rds_security_group_arn" {
 output "eks_nodes_security_group_arn" {
   description = "ARN do security group dos nodes EKS"
   value       = aws_security_group.eks_nodes.arn
+}
+
+# ===========================
+# DYNAMODB OUTPUTS
+# ===========================
+
+output "dynamodb_cook_to_order_table_name" {
+  description = "Nome da tabela DynamoDB para cook-to-order"
+  value       = aws_dynamodb_table.orders_cook_to_order.name
+}
+
+output "dynamodb_cook_to_order_table_arn" {
+  description = "ARN da tabela DynamoDB para cook-to-order"
+  value       = aws_dynamodb_table.orders_cook_to_order.arn
+}
+
+output "dynamodb_cook_to_order_table_id" {
+  description = "ID da tabela DynamoDB para cook-to-order"
+  value       = aws_dynamodb_table.orders_cook_to_order.id
+}
+
+output "dynamodb_cook_to_order_hash_key" {
+  description = "Hash key da tabela DynamoDB cook-to-order"
+  value       = aws_dynamodb_table.orders_cook_to_order.hash_key
+}
+
+# ===========================
+# OUTPUTS PARA LAMBDAS
+# ===========================
+
+output "rds_credentials" {
+  description = "RDS credentials for Lambda functions"
+  value = {
+    username = var.db_username
+    password = var.db_password
+  }
+  sensitive = true
+}
+
+output "vpc_config" {
+  description = "VPC configuration for Lambda functions"
+  value = {
+    vpc_id             = data.aws_vpc.existing.id
+    subnet_ids         = local.rds_subnet_ids
+    security_group_id  = aws_security_group.rds_mysql.id
+  }
+}
+
+output "order_database_config" {
+  description = "Order database configuration"
+  value = {
+    host     = aws_db_instance.fastfood_order.endpoint
+    database = aws_db_instance.fastfood_order.db_name
+    port     = aws_db_instance.fastfood_order.port
+  }
+}
+
+output "payment_database_config" {
+  description = "Payment database configuration"
+  value = {
+    host     = aws_db_instance.fastfood_payment.endpoint
+    database = aws_db_instance.fastfood_payment.db_name
+    port     = aws_db_instance.fastfood_payment.port
+  }
+}
+
+output "dynamodb_config" {
+  description = "DynamoDB configuration"
+  value = {
+    table_name = aws_dynamodb_table.orders_cook_to_order.name
+    table_arn  = aws_dynamodb_table.orders_cook_to_order.arn
+    region     = var.aws_region
+  }
 }
