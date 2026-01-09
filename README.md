@@ -1,253 +1,239 @@
-# FastFood DB Infrastructure - Infraestrutura de Banco de Dados
+# FastFood Database Infrastructure
 
-![Terraform](https://img.shields.io/badge/Terraform-1.0+-623CE4)
-![AWS RDS](https://img.shields.io/badge/AWS-RDS-527FFF)
-![DynamoDB](https://img.shields.io/badge/AWS-DynamoDB-4053D6)
+![Terraform](https://img.shields.io/badge/Terraform-1.5.0-7B42BC)
+![AWS RDS](https://img.shields.io/badge/AWS-RDS-FF9900)
 ![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1)
+![DynamoDB](https://img.shields.io/badge/DynamoDB-NoSQL-4053D6)
 
-## 📋 Sobre o Repositório
+## 📋 Sobre
 
-Repositório de infraestrutura como código (IaC) responsável pelo provisionamento e gerenciamento de todos os recursos de banco de dados do sistema FastFood na AWS.
+Este repositório contém a infraestrutura de banco de dados para o projeto FastFood, implementando uma arquitetura de microsserviços com **isolamento completo de dados**. Cada microsserviço possui seu próprio banco de dados dedicado, seguindo as melhores práticas de arquitetura de microsserviços.
 
-## 🎯 Responsabilidades
+## 🎯 Arquitetura de Dados
 
-### Provisionamento de Bancos de Dados
-- **RDS MySQL Main**: Banco principal para aplicação fast-food (clientes, produtos, categorias)
-- **RDS MySQL Order**: Banco dedicado para microsserviço de pedidos
-- **RDS MySQL Payment**: Banco dedicado para microsserviço de pagamentos
-- **DynamoDB CTO**: Tabela NoSQL para microsserviço de cozinha (cook-to-order)
+### Estratégia de Banco de Dados por Microsserviço
 
-### Configurações de Rede e Segurança
-- **VPC e Subnets**: Configuração de rede isolada
-- **Security Groups**: Regras de firewall para acesso aos bancos
-- **DB Subnet Groups**: Grupos de subnets para alta disponibilidade
-- **Private Access**: Bancos acessíveis apenas dentro da VPC
-
-### Gerenciamento
-- **Backups Automáticos**: Configuração de retenção de backups
-- **Multi-AZ**: Alta disponibilidade com réplicas em múltiplas zonas
-- **Monitoring**: Integração com CloudWatch
-- **Encryption**: Criptografia de dados em repouso
-
-## 🏗️ Arquitetura
-
-### Estrutura do Repositório
+Seguindo o princípio de **Database per Service**, cada microsserviço possui seu próprio banco de dados:
 
 ```
-terraform/
-├── data-sources.tf          → Data sources AWS (VPC, Subnets)
-├── dynamodb-CTO.tf          → DynamoDB para Cook-to-Order
-├── outputs.tf               → Outputs dos recursos criados
-├── providers.tf             → Configuração de providers AWS
-├── rds-main.tf              → RDS MySQL principal
-├── rds-order.tf             → RDS MySQL para pedidos
-├── rds-payment.tf           → RDS MySQL para pagamentos
-├── rds-subnet-group.tf      → Subnet groups para RDS
-├── security-groups.tf       → Security groups
-├── variables.tf             → Variáveis de configuração
-└── terraform.tfvars.example → Exemplo de variáveis
+┌─────────────────┐     ┌──────────────────┐
+│  fast-food      │────▶│ MySQL RDS        │
+│  (Main App)     │     │ fastfood_main    │
+└─────────────────┘     └──────────────────┘
+
+┌─────────────────┐     ┌──────────────────┐
+│  fast-food-auth │────▶│ MySQL RDS        │
+│  (Auth)         │     │ fastfood_main    │
+└─────────────────┘     └──────────────────┘
+
+┌─────────────────┐     ┌──────────────────┐
+│  fast-food-order│────▶│ MySQL RDS        │
+│  (Orders)       │     │ fastfood_order   │
+└─────────────────┘     └──────────────────┘
+
+┌─────────────────┐     ┌──────────────────┐
+│fast-food-payment│────▶│ MySQL RDS        │
+│  (Payments)     │     │ fastfood_payment │
+└─────────────────┘     └──────────────────┘
+
+┌─────────────────┐     ┌──────────────────┐
+│fast-food-cook-  │────▶│ DynamoDB         │
+│  to-order (CTO) │     │ orders-cto       │
+└─────────────────┘     └──────────────────┘
 ```
 
-### Diagrama de Infraestrutura
+## 🗄️ Bancos de Dados Implementados
+
+### SQL (MySQL 8.0 - Amazon RDS)
+
+#### 1. **fastfood_main** (Compartilhado: Main App + Auth)
+- **Serviços**: `fast-food` + `fast-food-auth`
+- **Motivo do compartilhamento**: Auth e Main App compartilham entidades de Cliente
+- **Tabelas**:
+  - `clients` - Dados de clientes
+  - `products` - Catálogo de produtos
+  - `categories` - Categorias de produtos
+- **Características**:
+  - Engine: MySQL 8.0
+  - Instance: db.t3.micro
+  - Storage: 20GB GP2
+  - Multi-AZ: Configurável
+  - Backup: 7 dias de retenção
+
+#### 2. **fastfood_order** (Dedicado: Order Service)
+- **Serviço**: `fast-food-order`
+- **Tabelas**:
+  - `orders` - Pedidos
+  - `order_products` - Itens do pedido
+- **Características**:
+  - Engine: MySQL 8.0
+  - Instance: db.t3.micro
+  - Storage: 20GB GP2
+  - Isolamento completo de dados de pedidos
+
+#### 3. **fastfood_payment** (Dedicado: Payment Service)
+- **Serviço**: `fast-food-payment`
+- **Tabelas**:
+  - `payments` - Transações de pagamento
+  - `payment_logs` - Histórico de webhooks
+- **Características**:
+  - Engine: MySQL 8.0
+  - Instance: db.t3.micro
+  - Storage: 20GB GP2
+  - Isolamento completo de dados financeiros
+
+### NoSQL (DynamoDB)
+
+#### 4. **fastfood-orders-cook-to-order** (Dedicado: CTO Service)
+- **Serviço**: `fast-food-cook-to-order`
+- **Partition Key**: `order_id` (String)
+- **Billing Mode**: PAY_PER_REQUEST (On-Demand)
+- **Motivo da escolha NoSQL**:
+  - ✅ **Alta Performance**: Latência de milissegundos
+  - ✅ **Escalabilidade Automática**: Ajusta capacidade conforme demanda
+  - ✅ **Operações Simples**: CRUD por ID, sem JOINs complexos
+  - ✅ **Real-time**: Ideal para atualizações frequentes de status
+  - ✅ **Custo-benefício**: Pay-per-request para workloads variáveis
+
+**Estrutura de Dados**:
+```json
+{
+  "order_id": "uuid",
+  "order_number": 123,
+  "status": "PREPARING",
+  "items": [...],
+  "priority": 1,
+  "created_at": "2026-01-09T19:00:00Z",
+  "updated_at": "2026-01-09T19:05:00Z"
+}
+```
+
+## 🏗️ Estrutura do Repositório
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                         AWS VPC                              │
-│                                                              │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
-│  │   Subnet A   │  │   Subnet B   │  │   Subnet C   │     │
-│  │  us-east-1a  │  │  us-east-1b  │  │  us-east-1c  │     │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘     │
-│         │                 │                 │              │
-│  ┌──────▼─────────────────▼─────────────────▼──────┐      │
-│  │           DB Subnet Group                        │      │
-│  └──────┬───────────┬───────────┬───────────────────┘      │
-│         │           │           │                          │
-│  ┌──────▼──────┐ ┌──▼───────┐ ┌▼────────────┐            │
-│  │  RDS Main   │ │ RDS Order│ │ RDS Payment │            │
-│  │   MySQL     │ │  MySQL   │ │   MySQL     │            │
-│  │ (Multi-AZ)  │ │(Multi-AZ)│ │ (Multi-AZ)  │            │
-│  └─────────────┘ └──────────┘ └─────────────┘            │
-│                                                            │
-│  ┌─────────────────────────────────────────┐              │
-│  │         DynamoDB (Global)               │              │
-│  │   fastfood-orders-cook-to-order         │              │
-│  └─────────────────────────────────────────┘              │
-└─────────────────────────────────────────────────────────────┘
+fast-food-db-infra/
+├── terraform/
+│   ├── providers.tf           → Configuração AWS
+│   ├── variables.tf           → Variáveis de configuração
+│   ├── data-sources.tf        → VPC e Subnets
+│   ├── security-groups.tf     → Security Groups RDS
+│   ├── rds-subnet-group.tf    → Subnet Group para RDS
+│   ├── rds-main.tf            → RDS Main (App + Auth)
+│   ├── rds-order.tf           → RDS Order Service
+│   ├── rds-payment.tf         → RDS Payment Service
+│   ├── dynamodb-CTO.tf        → DynamoDB Cook-to-Order
+│   └── outputs.tf             → Outputs de conexão
+└── .github/workflows/
+    └── terraform-deploy.yml   → CI/CD Terraform
 ```
 
-## 🛠️ Stack Tecnológica
+## 🔒 Segurança e Isolamento
 
-### Infrastructure as Code
-- **Terraform**: >= 1.0
-- **AWS Provider**: ~> 5.0
+### Isolamento de Rede
+- **RDS Instances**: Privadas (não acessíveis publicamente)
+- **VPC**: Todas as instâncias na mesma VPC
+- **Security Groups**: Regras específicas por serviço
+- **Acesso**: Apenas via Lambda/EKS dentro da VPC
 
-### AWS Services
-- **Amazon RDS MySQL**: 8.0
-  - Instance Class: db.t3.micro (configurável)
-  - Storage: 20GB gp2 (configurável)
-  - Multi-AZ: Habilitado
-  - Backup Retention: 7 dias
+### Isolamento de Dados
+- ✅ Cada microsserviço acessa **APENAS** seu próprio banco
+- ✅ Sem acesso cross-database
+- ✅ Credenciais isoladas por serviço
+- ✅ Comunicação entre serviços via API (não via DB)
 
-- **Amazon DynamoDB**
-  - Billing Mode: PAY_PER_REQUEST
-  - Encryption: Habilitada
-  - Point-in-time Recovery: Habilitado
+### Credenciais
+- Armazenadas em **AWS Secrets Manager** ou **Environment Variables**
+- Rotação automática configurável
+- Acesso via IAM Roles
 
-### Recursos Provisionados
-
-#### RDS Instances
-1. **fastfood-db** (Main)
-   - Database: `fastfood`
-   - Uso: Aplicação principal (clientes, produtos, categorias)
-
-2. **fastfood-order-db**
-   - Database: `fastfood_order`
-   - Uso: Microsserviço de pedidos
-
-3. **fastfood-payment-db**
-   - Database: `fastfood_payment`
-   - Uso: Microsserviço de pagamentos
-
-#### DynamoDB Tables
-1. **fastfood-orders-cook-to-order**
-   - Partition Key: `order_id` (String)
-   - Uso: Fila de preparação da cozinha
-
-## 🚀 Como Usar
+## 🚀 Deploy
 
 ### Pré-requisitos
-- Terraform >= 1.0 instalado
-- AWS CLI configurado com credenciais válidas
-- Permissões IAM necessárias:
-  - `AmazonRDSFullAccess`
-  - `AmazonDynamoDBFullAccess`
-  - `AmazonVPCFullAccess`
+- Terraform 1.5.0+
+- AWS CLI configurado
+- Credenciais AWS com permissões para RDS e DynamoDB
 
-### Configuração
-
-```bash
-# 1. Clonar repositório
-git clone https://github.com/fiap-software-architecture-tech/fast-food-db-infra.git
-cd fast-food-db-infra/terraform
-
-# 2. Copiar e configurar variáveis
-cp terraform.tfvars.example terraform.tfvars
-# Editar terraform.tfvars com suas configurações
-
-# 3. Inicializar Terraform
-terraform init
-
-# 4. Validar configuração
-terraform validate
-
-# 5. Planejar mudanças
-terraform plan
-
-# 6. Aplicar infraestrutura
-terraform apply
-```
-
-### Variáveis Importantes
+### Variáveis Necessárias
 
 ```hcl
 # terraform.tfvars
-environment           = "production"
-db_instance_class     = "db.t3.micro"
-db_allocated_storage  = 20
-db_username          = "admin"
-db_password          = "SecurePassword123!"  # Use AWS Secrets Manager
-db_multi_az          = true
+environment              = "production"
+db_username             = "admin"
+db_password             = "SECURE_PASSWORD"
+db_instance_class       = "db.t3.micro"
+db_allocated_storage    = 20
+db_multi_az             = false
 db_backup_retention_period = 7
-db_deletion_protection = true
-db_skip_final_snapshot = false
+db_deletion_protection  = true
+db_skip_final_snapshot  = false
 ```
 
-### Outputs
-
-Após o apply, os seguintes outputs estarão disponíveis:
+### Comandos de Deploy
 
 ```bash
-# Endpoints RDS
-rds_main_endpoint     = "fastfood-db.xxxxx.us-east-1.rds.amazonaws.com:3306"
-rds_order_endpoint    = "fastfood-order-db.xxxxx.us-east-1.rds.amazonaws.com:3306"
-rds_payment_endpoint  = "fastfood-payment-db.xxxxx.us-east-1.rds.amazonaws.com:3306"
+# Inicializar Terraform
+cd terraform
+terraform init
 
-# DynamoDB
-dynamodb_table_name   = "fastfood-orders-cook-to-order"
-dynamodb_table_arn    = "arn:aws:dynamodb:us-east-1:xxxxx:table/fastfood-orders-cook-to-order"
+# Validar configuração
+terraform validate
+
+# Planejar mudanças
+terraform plan
+
+# Aplicar infraestrutura
+terraform apply
+
+# Outputs (endpoints de conexão)
+terraform output
 ```
 
-## 🔒 Segurança
+## 🔄 CI/CD
 
-### Boas Práticas Implementadas
-- ✅ **Encryption at Rest**: Todos os bancos com criptografia habilitada
-- ✅ **Private Subnets**: RDS em subnets privadas (sem acesso público)
-- ✅ **Security Groups**: Acesso restrito apenas de recursos autorizados
-- ✅ **Backup Automático**: Retenção de 7 dias configurável
-- ✅ **Multi-AZ**: Alta disponibilidade em múltiplas zonas
-- ✅ **Deletion Protection**: Proteção contra exclusão acidental
-- ✅ **IAM Authentication**: Suporte a autenticação via IAM (configurável)
+Este repositório possui workflow automatizado de CI/CD via GitHub Actions:
 
-### Recomendações
-- Use **AWS Secrets Manager** para armazenar credenciais
-- Configure **VPN ou AWS PrivateLink** para acesso seguro
-- Habilite **CloudWatch Alarms** para monitoramento
-- Implemente **Backup Strategy** com snapshots manuais periódicos
+### Workflow: `terraform-deploy.yml`
+- **Trigger**: Merge para `modulo_4`
+- **Jobs**:
+  - Validação Terraform
+  - Plan (preview de mudanças)
+  - Apply (deploy automático)
+  - Outputs (endpoints de conexão)
 
 ## 📊 Monitoramento
 
 ### CloudWatch Metrics
-- CPU Utilization
-- Database Connections
-- Free Storage Space
-- Read/Write IOPS
-- Read/Write Latency
+- **RDS**:
+  - CPU Utilization
+  - Database Connections
+  - Free Storage Space
+  - Read/Write IOPS
+
+- **DynamoDB**:
+  - Consumed Read/Write Capacity
+  - Throttled Requests
+  - User Errors
 
 ### Logs
-- Error Logs
-- Slow Query Logs
-- General Logs
+- RDS Error Logs → CloudWatch Logs
+- DynamoDB Access Logs → CloudWatch Logs
 
-## 💰 Estimativa de Custos
+## 🔗 Conexão dos Microsserviços
 
-### RDS MySQL (por instância)
-- **db.t3.micro**: ~$15-30/mês
-- **Storage (20GB)**: ~$2-4/mês
-- **Backup Storage**: Variável
+Cada microsserviço se conecta ao seu banco via:
+
+### RDS (MySQL)
+```typescript
+// Prisma ORM
+DATABASE_URL="mysql://user:pass@fastfood-order-db.xxx.rds.amazonaws.com:3306/fastfood_order"
+```
 
 ### DynamoDB
-- **On-Demand**: ~$0-10/mês (baseado em uso)
-
-**Total Estimado**: ~$50-100/mês (3 RDS + 1 DynamoDB)
-
-### Otimização de Custos
-- Use instâncias menores em ambientes de desenvolvimento
-- Configure `db_deletion_protection = false` em dev
-- Use `db_skip_final_snapshot = true` em dev
-- Considere Reserved Instances para produção
-
-## 🔗 Repositórios Relacionados
-
-- **[fast-food](https://github.com/fiap-software-architecture-tech/fast-food)** - Aplicação Principal
-- **[fast-food-order](https://github.com/fiap-software-architecture-tech/fast-food-order)** - Microsserviço de Pedidos
-- **[fast-food-payment](https://github.com/fiap-software-architecture-tech/fast-food-payment)** - Microsserviço de Pagamentos
-- **[fast-food-cook-to-order](https://github.com/fiap-software-architecture-tech/fast-food-cook-to-order)** - Microsserviço de Cozinha
-- **[fast-food-k8s-infra](https://github.com/fiap-software-architecture-tech/fast-food-k8s-infra)** - Infraestrutura Kubernetes
-
-## 🧹 Cleanup
-
-### Destruir Infraestrutura
-
-```bash
-# ATENÇÃO: Isso removerá todos os bancos de dados!
-cd terraform
-terraform destroy
-
-# Para ambientes de produção, considere:
-# 1. Fazer backup manual antes
-# 2. Exportar dados importantes
-# 3. Desabilitar deletion_protection se necessário
+```typescript
+// AWS SDK
+const dynamodb = new DynamoDBClient({
+  region: "us-east-1"
+});
 ```
 
 ## 👥 Equipe
